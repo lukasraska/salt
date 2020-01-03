@@ -465,7 +465,7 @@ class AsyncTCPPubChannel(salt.transport.mixins.auth.AESPubClientMixin, salt.tran
         @tornado.gen.coroutine
         def _do_transfer():
             msg = self._package_load(self.auth.crypticle.dumps(load))
-            package = salt.transport.frame.frame_msg(msg, header=None)
+            package = salt.transport.frame.frame_msg(msg, serial=self.serial, header=None)
             yield self.message_client.write_to_stream(package)
             raise tornado.gen.Return(True)
 
@@ -785,7 +785,7 @@ class SaltMessageServer(tornado.tcpserver.TCPServer, object):
         '''
         log.trace('Req client %s connected', address)
         self.clients.append((stream, address))
-        unpacker = salt.utils.msgpack.Unpacker()
+        unpacker = salt.utils.msgpack.Unpacker(ext_hook=salt.payload.ext_type_decoder)
         try:
             while True:
                 wire_bytes = yield stream.read_bytes(4096, partial=True)
@@ -973,6 +973,8 @@ class SaltMessageClient(object):
         self._stream_return_future = tornado.concurrent.Future()
         self.io_loop.spawn_callback(self._stream_return)
 
+        self.serial = salt.payload.Serial(opts)
+
     def _stop_io_loop(self):
         if self.io_loop is not None:
             self.io_loop.stop()
@@ -1084,7 +1086,7 @@ class SaltMessageClient(object):
                     not self._connecting_future.done() or
                     self._connecting_future.result() is not True):
                 yield self._connecting_future
-            unpacker = salt.utils.msgpack.Unpacker()
+            unpacker = salt.utils.msgpack.Unpacker(ext_hook=salt.payload.ext_type_decoder)
             while not self._closing:
                 try:
                     self._read_until_future = self._stream.read_bytes(4096, partial=True)
@@ -1234,7 +1236,7 @@ class SaltMessageClient(object):
         # if we don't have a send queue, we need to spawn the callback to do the sending
         if len(self.send_queue) == 0:
             self.io_loop.spawn_callback(self._stream_send)
-        self.send_queue.append((message_id, salt.transport.frame.frame_msg(msg, header=header)))
+        self.send_queue.append((message_id, salt.transport.frame.frame_msg(msg, serial=self.serial, header=header)))
         return future
 
 
@@ -1364,7 +1366,7 @@ class PubServer(tornado.tcpserver.TCPServer, object):
 
     @tornado.gen.coroutine
     def _stream_read(self, client):
-        unpacker = salt.utils.msgpack.Unpacker()
+        unpacker = salt.utils.msgpack.Unpacker(ext_hook=salt.payload.ext_type_decoder)
         while not self._closing:
             try:
                 client._read_until_future = client.stream.read_bytes(4096, partial=True)

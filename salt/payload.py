@@ -59,6 +59,15 @@ def format_payload(enc, **kwargs):
     payload['load'] = load
     return package(payload)
 
+def ext_type_decoder(code, data):
+    '''
+    Custom decoder for msgpack.
+    '''
+    if code == 78:
+        data = salt.utils.stringutils.to_unicode(data)
+        return datetime.datetime.strptime(data, '%Y%m%dT%H:%M:%S.%f')
+    return data
+
 
 class Serial(object):
     '''
@@ -91,12 +100,6 @@ class Serial(object):
                          the contents cannot be converted.
         '''
         try:
-            def ext_type_decoder(code, data):
-                if code == 78:
-                    data = salt.utils.stringutils.to_unicode(data)
-                    return datetime.datetime.strptime(data, '%Y%m%dT%H:%M:%S.%f')
-                return data
-
             gc.disable()  # performance optimization for msgpack
             loads_kwargs = {'use_list': True,
                             'ext_hook': ext_type_decoder}
