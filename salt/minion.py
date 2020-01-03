@@ -19,7 +19,6 @@ import contextlib
 import multiprocessing
 from random import randint, shuffle
 from stat import S_IMODE
-import salt.serializers.msgpack
 from binascii import crc32
 # Import Salt Libs
 # pylint: disable=import-error,no-name-in-module,redefined-builtin
@@ -30,6 +29,7 @@ from salt.ext.six.moves import range
 from salt.utils.zeromq import zmq, ZMQDefaultLoop, install_zmq, ZMQ_VERSION_INFO
 import salt.transport.client
 import salt.defaults.exitcodes
+import salt.payload
 
 from salt.utils.ctx import RequestContext
 
@@ -1109,6 +1109,8 @@ class Minion(MinionBase):
         self.timeout = timeout
         self.safe = safe
 
+        self.serial = salt.payload.Serial(opts)
+
         self._running = None
         self.win_proc = []
         self.subprocess_list = salt.utils.process.SubprocessList()
@@ -1411,7 +1413,7 @@ class Minion(MinionBase):
         if self.opts['minion_sign_messages']:
             log.trace('Signing event to be published onto the bus.')
             minion_privkey_path = os.path.join(self.opts['pki_dir'], 'minion.pem')
-            sig = salt.crypt.sign_message(minion_privkey_path, salt.serializers.msgpack.serialize(load))
+            sig = salt.crypt.sign_message(minion_privkey_path, self.serial.dumps(load))
             load['sig'] = sig
 
         with salt.transport.client.ReqChannel.factory(self.opts) as channel:
@@ -1423,7 +1425,7 @@ class Minion(MinionBase):
         if self.opts['minion_sign_messages']:
             log.trace('Signing event to be published onto the bus.')
             minion_privkey_path = os.path.join(self.opts['pki_dir'], 'minion.pem')
-            sig = salt.crypt.sign_message(minion_privkey_path, salt.serializers.msgpack.serialize(load))
+            sig = salt.crypt.sign_message(minion_privkey_path, self.serial.dumps(load))
             load['sig'] = sig
 
         with salt.transport.client.AsyncReqChannel.factory(self.opts) as channel:
