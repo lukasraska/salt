@@ -1,0 +1,1 @@
+Use default timezone offset in scheduler when correct timezone cannot be determined
